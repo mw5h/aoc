@@ -10,8 +10,9 @@ def part1(c):
    visited = set()
 
    while len(visit):
+       v = {r[0] for r in data.items() if len(visit & set(r[1].keys()) - visited)}
        visited |= visit
-       visit = {r[0] for r in data.items() if len(visit & set(r[1].keys()))}
+       visit = v
    return len(visited)
 
 def part2(c):
