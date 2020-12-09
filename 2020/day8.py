@@ -20,5 +20,5 @@ def simulate(d):
 path = simulate(data)
 print path[0]
 
-flipper = {'nop' : 'jmp', 'jmp': 'nop'}
-print [s[0] for s in [simulate([data[i] if i != flip else (flipper[data[i][0]], data[i][1]) for i in range(0, len(data))]) for flip in path[1] if data[flip][0] != 'acc'] if s[2] == len(data)][0]
+flipper = {'nop' : 'jmp', 'jmp': 'nop', 'acc': 'acc'}
+print [s[0] for s in [simulate([data[i] if i != flip else (flipper[data[i][0]], data[i][1]) for i in range(0, len(data))]) for flip in path[1]] if s[2] == len(data)][0]
