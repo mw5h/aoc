@@ -8,5 +8,6 @@ def onestep(s, t):
     s[1][s[0]] = t - 1
     return (v, s[1])
 
-print 'part 1:', reduce(onestep, range(0, 2020), (None, {}))[0]
-print 'part 2:', reduce(onestep, range(0, 30000000), (None, {}))[0]
+print('part 1:', reduce(onestep, range(0, 2020), (None, {}))[0])
+print('part 2:', reduce(onestep, range(0, 30000000), (None, {}))[0])
+
