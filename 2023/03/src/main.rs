@@ -1,17 +1,17 @@
-use std::collections::{LinkedList, VecDeque};
+use std::collections::{HashMap, LinkedList, VecDeque};
 use std::env;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error};
 use std::iter::*;
 use std::path::Path;
 
-#[derive(PartialEq, Debug, Copy, Clone)]
+#[derive(PartialEq, Debug, Copy, Clone, Hash, Eq)]
 enum SchematicItemType {
     PartNumber(u32),
     Symbol(char),
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 struct SchematicItem {
     x: usize,
     y: usize,
@@ -164,19 +164,42 @@ fn part1(lines: &mut LineReader) -> Result<u32, Error> {
     Ok(val)
 }
 
+fn part2(lines: &mut LineReader) -> Result<u32, Error> {
+    let toks = TokenReader::try_from(lines)?;
+    let (g, rest): (Vec<SchematicItem>, _) = toks
+        .into_iter()
+        .partition(|si| si.typ == SchematicItemType::Symbol('*'));
+    let mut gears: HashMap<SchematicItem, Vec<u32>> =
+        g.into_iter().map(|si| (si, Vec::<u32>::new())).collect();
+    for t in rest {
+        if let SchematicItemType::PartNumber(num) = t.typ {
+            for (gear, parts) in gears.iter_mut() {
+                if t.is_adj(gear) {
+                    parts.push(num);
+                }
+            }
+        }
+    }
+    Ok(gears
+        .values()
+        .filter(|x| x.len() == 2)
+        .fold(0, |a, x| a + x[0] * x[1]))
+}
+
 fn main() {
     let args: Vec<_> = env::args().collect();
     let filename = Path::new(&args[1]);
 
-    let file = match File::open(&filename) {
-        Err(why) => panic!("couldn't open input file {:?}: {}", filename, why),
-        Ok(file) => file,
-    };
+    let funcs: Vec<&dyn Fn(&mut LineReader) -> Result<u32, Error>> = vec![&part1, &part2];
+    let names = vec!["part1", "part2"];
+    for (n, f) in names.iter().zip(funcs.iter()) {
+        let file = match File::open(&filename) {
+            Err(why) => panic!("couldn't open input file {:?}: {}", filename, why),
+            Ok(file) => file,
+        };
 
-    println!(
-        "part1 = {}",
-        part1(&mut BufReader::new(file).lines()).unwrap()
-    );
+        println!("{n} = {}", f(&mut BufReader::new(file).lines()).unwrap());
+    }
 }
 
 #[cfg(test)]
@@ -199,6 +222,14 @@ mod tests {
         assert_eq!(
             part1(&mut TEST_DATA.lines().map(|x| Ok(String::from(x)))).unwrap(),
             4361
+        );
+    }
+
+    #[test]
+    fn test_part2() {
+        assert_eq!(
+            part2(&mut TEST_DATA.lines().map(|x| Ok(String::from(x)))).unwrap(),
+            467835
         );
     }
 }
