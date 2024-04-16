@@ -1,9 +1,9 @@
 use std::collections::{HashMap, LinkedList, VecDeque};
 use std::env;
-use std::fs::File;
-use std::io::{BufRead, BufReader, Error};
+use std::io::Error;
 use std::iter::*;
-use std::path::Path;
+
+use util;
 
 #[derive(PartialEq, Debug, Copy, Clone, Hash, Eq)]
 enum SchematicItemType {
@@ -188,17 +188,15 @@ fn part2(lines: &mut LineReader) -> Result<u32, Error> {
 
 fn main() {
     let args: Vec<_> = env::args().collect();
-    let filename = Path::new(&args[1]);
+    let filename = &args[1];
 
     let funcs: Vec<&dyn Fn(&mut LineReader) -> Result<u32, Error>> = vec![&part1, &part2];
     let names = vec!["part1", "part2"];
     for (n, f) in names.iter().zip(funcs.iter()) {
-        let file = match File::open(&filename) {
-            Err(why) => panic!("couldn't open input file {:?}: {}", filename, why),
-            Ok(file) => file,
-        };
-
-        println!("{n} = {}", f(&mut BufReader::new(file).lines()).unwrap());
+        println!(
+            "{n} = {}",
+            f(&mut util::read_file(filename).unwrap()).unwrap()
+        );
     }
 }
 
@@ -220,7 +218,7 @@ mod tests {
     #[test]
     fn test_part1() {
         assert_eq!(
-            part1(&mut TEST_DATA.lines().map(|x| Ok(String::from(x)))).unwrap(),
+            part1(&mut util::read_testdata(TEST_DATA).unwrap()).unwrap(),
             4361
         );
     }
@@ -228,7 +226,7 @@ mod tests {
     #[test]
     fn test_part2() {
         assert_eq!(
-            part2(&mut TEST_DATA.lines().map(|x| Ok(String::from(x)))).unwrap(),
+            part2(&mut util::read_testdata(TEST_DATA).unwrap()).unwrap(),
             467835
         );
     }
