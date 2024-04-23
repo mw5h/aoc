@@ -5,7 +5,7 @@ use util;
 
 #[derive(Debug)]
 struct Mapper {
-    map: BTreeMap<usize, (usize, usize)>,
+    map: BTreeMap<u64, (u64, u64, i64)>,
 }
 
 impl Mapper {
@@ -19,37 +19,68 @@ impl Mapper {
         self.map.clear();
     }
 
-    fn add_mapping(&mut self, from: usize, to: usize, len: usize) -> () {
-        self.map.insert(from, (to, len));
+    fn add_mapping(&mut self, from: u64, to: u64, len: u64) -> () {
+        self.map
+            .insert(from, (from, from + len - 1, to as i64 - from as i64));
     }
 
-    fn lookup(&self, from: usize) -> usize {
-        for (f, (t, l)) in self.map.iter() {
-            if *f > from {
+    fn lookup(&self, from: u64, to: u64) -> Vec<(u64, u64)> {
+        let mut result = Vec::<(u64, u64)>::new();
+        let mut from_idx = from;
+        for (_, (f, t, d)) in self.map.iter() {
+            if *t < from_idx {
+                continue;
+            }
+
+            if to < *f {
+                continue;
+            }
+
+            if from_idx < *f {
+                result.push((from_idx, *f - 1));
+                from_idx = *f;
+            }
+
+            let new_from = from_idx
+                .checked_add_signed(*d)
+                .expect("from value underflow");
+            if to <= *t {
+                result.push((
+                    new_from,
+                    to.checked_add_signed(*d)
+                        .expect("to value underflow {to} + {d}"),
+                ));
+                from_idx = to + 1;
                 break;
             }
 
-            if *f <= from && *f + *l > from {
-                return *t + (from - *f);
-            }
+            result.push((
+                new_from,
+                t.checked_add_signed(*d).expect("to value underflow"),
+            ));
+            from_idx = *t + 1;
         }
 
-        from
+        if from_idx <= to {
+            result.push((from_idx, to));
+        }
+
+        result
     }
 }
 
-fn part1(lines: impl Iterator<Item = Result<String, io::Error>>) -> Result<usize, io::Error> {
-    let mut seeds = Vec::<usize>::new();
+fn process_data(
+    lines: impl Iterator<Item = Result<String, io::Error>>,
+    seed_parser: fn(&str) -> Vec<(u64, u64)>,
+) -> Result<u64, io::Error> {
+    let mut seeds = Vec::<(u64, u64)>::new();
     let mut mapper = Mapper::new();
     for line in lines {
         let l = line?;
 
         if l.contains("seeds: ") {
             let s = l.strip_prefix("seeds: ").unwrap();
-            seeds = s
-                .split(' ')
-                .map(|x| x.parse::<usize>().expect("expected integer!"))
-                .collect();
+            seeds = seed_parser(s);
             continue;
         }
 
@@ -58,33 +89,62 @@ fn part1(lines: impl Iterator<Item = Result<String, io::Error>>) -> Result<usize
         }
 
         if l.contains("map:") {
-            seeds = seeds.into_iter().map(|x| mapper.lookup(x)).collect();
+            seeds = seeds
+                .into_iter()
+                .map(|(f, t)| mapper.lookup(f, t))
+                .flatten()
+                .collect();
             mapper.reset();
             continue;
         }
 
         let new_mapping = l
             .split(' ')
-            .map(|x| x.parse::<usize>().expect("expected integer!"))
+            .map(|x| x.parse::<u64>().expect("expected integer!"))
             .collect::<Vec<_>>();
         mapper.add_mapping(new_mapping[1], new_mapping[0], new_mapping[2]);
     }
     Ok(seeds
         .into_iter()
-        .map(|x| mapper.lookup(x))
+        .map(|(f, t)| mapper.lookup(f, t))
+        .flatten()
+        .map(|(f, _)| f)
         .min()
         .expect("no minimum value!"))
 }
 
-fn part2(lines: impl Iterator<Item = Result<String, io::Error>>) -> Result<usize, io::Error> {
-    Ok(0)
+fn part1_seeds(seed_string: &str) -> Vec<(u64, u64)> {
+    seed_string
+        .split(' ')
+        .map(|x| x.parse::<u64>().expect("expected integer!"))
+        .map(|x| (x, x))
+        .collect()
+}
+
+fn part1(lines: impl Iterator<Item = Result<String, io::Error>>) -> Result<u64, io::Error> {
+    process_data(lines, part1_seeds)
+}
+
+fn part2_seeds(seed_string: &str) -> Vec<(u64, u64)> {
+    seed_string
+        .split(' ')
+        .map(|x| x.parse::<u64>().expect("expected integer!"))
+        .collect::<Vec<u64>>()
+        .chunks(2)
+        .map(|x| (x[0], x[0] + x[1] - 1))
+        .collect()
+}
+
+fn part2(lines: impl Iterator<Item = Result<String, io::Error>>) -> Result<u64, io::Error> {
+    process_data(lines, part2_seeds)
 }
 
 fn main() {
     let args: Vec<_> = std::env::args().collect();
     println!(
-        "part1 = {}",
-        part1(util::read_file(&args[1]).unwrap()).unwrap()
+        "part1 = {}  part2 = {}",
+        part1(util::read_file(&args[1]).unwrap()).unwrap(),
+        part2(util::read_file(&args[1]).unwrap()).unwrap()
     );
 }
 
@@ -133,6 +193,6 @@ humidity-to-location map:
 
     #[test]
     fn test_part2() {
-        assert_eq!(part2(util::read_testdata(TEST_DATA).unwrap()).unwrap(), 30);
+        assert_eq!(part2(util::read_testdata(TEST_DATA).unwrap()).unwrap(), 46);
     }
 }
