@@ -5,6 +5,7 @@ use util;
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, PartialOrd, Ord)]
 enum Card {
+    Joker,
     Two,
     Three,
     Four,
@@ -20,8 +21,8 @@ enum Card {
     Ace,
 }
 
-impl From<char> for Card {
-    fn from(value: char) -> Self {
+impl Card {
+    fn new(value: char, with_joker: bool) -> Self {
         match value {
             '2' => Self::Two,
             '3' => Self::Three,
@@ -32,7 +33,13 @@ impl From<char> for Card {
             '8' => Self::Eight,
             '9' => Self::Nine,
             'T' => Self::Ten,
-            'J' => Self::Jack,
+            'J' => {
+                if with_joker {
+                    Self::Joker
+                } else {
+                    Self::Jack
+                }
+            }
             'Q' => Self::Queen,
             'K' => Self::King,
             'A' => Self::Ace,
@@ -83,12 +90,12 @@ impl PartialOrd for Hand {
     }
 }
 
-impl From<String> for Hand {
-    fn from(value: String) -> Self {
+impl Hand {
+    fn new(value: String, with_joker: bool) -> Self {
         let (handstr, bidstr) = value.split_once(' ').unwrap();
         let cards: [Card; 5] = handstr
             .chars()
-            .map(|x| Card::from(x))
+            .map(|x| Card::new(x, with_joker))
             .collect::<Vec<_>>()
             .try_into()
             .expect("unable to build array");
@@ -101,17 +108,18 @@ impl From<String> for Hand {
                 counts.insert(*c, 1);
             }
         }
+        let jokers = counts.remove(&Card::Joker).unwrap_or(0);
         let mut sorted_counts = counts.into_values().collect::<Vec<_>>();
         sorted_counts.sort_unstable_by(|a, b| b.cmp(a));
 
-        let r#type = match sorted_counts[0] {
+        let r#type = match sorted_counts.get(0).unwrap_or(&0) + jokers {
             5 => HandType::FiveOfAKind,
             4 => HandType::FourOfAKind,
-            3 => match sorted_counts[1] {
+            3 => match sorted_counts.get(1).unwrap_or(&0) {
                 2 => HandType::FullHouse,
                 _ => HandType::ThreeOfAKind,
             },
-            2 => match sorted_counts[1] {
+            2 => match sorted_counts.get(1).unwrap_or(&0) {
                 2 => HandType::TwoPair,
                 _ => HandType::OnePair,
             },
@@ -121,9 +129,12 @@ impl From<String> for Hand {
     }
 }
 
-fn part1(lines: impl Iterator<Item = Result<String, io::Error>>) -> Result<usize, io::Error> {
+fn calculate_winnings(
+    lines: impl Iterator<Item = Result<String, io::Error>>,
+    with_jokers: bool,
+) -> Result<usize, io::Error> {
     let mut hands = lines
-        .map(|l| l.map(|x| Hand::from(x)))
+        .map(|l| l.map(|x| Hand::new(x, with_jokers)))
         .collect::<Result<Vec<_>, _>>()?;
 
     hands.sort_unstable();
@@ -135,11 +146,20 @@ fn part1(lines: impl Iterator<Item = Result<String, io::Error>>) -> Result<usize
         .sum())
 }
 
+fn part1(lines: impl Iterator<Item = Result<String, io::Error>>) -> Result<usize, io::Error> {
+    calculate_winnings(lines, false)
+}
+
+fn part2(lines: impl Iterator<Item = Result<String, io::Error>>) -> Result<usize, io::Error> {
+    calculate_winnings(lines, true)
+}
+
 fn main() {
     let args: Vec<_> = std::env::args().collect();
     println!(
-        "part1 = {}",
+        "part1 = {}  part2 = {}",
         part1(util::read_file(&args[1]).unwrap()).unwrap(),
+        part2(util::read_file(&args[1]).unwrap()).unwrap(),
     );
 }
 
@@ -158,6 +178,14 @@ QQQJA 483";
         assert_eq!(
             part1(util::read_testdata(TEST_DATA).unwrap()).unwrap(),
             6440
+        );
+    }
+
+    #[test]
+    fn test_part2() {
+        assert_eq!(
+            part2(util::read_testdata(TEST_DATA).unwrap()).unwrap(),
+            5905
         );
     }
 }
